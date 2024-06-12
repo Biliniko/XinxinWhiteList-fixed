@@ -3,7 +3,6 @@ package ltd.dreamcraft.xinxinwhitelist.beans;
 /**
  * @author haishen668
  * @version 1.0
- * @description:
  * @date 2024/4/9 16:59
  */
 public class Sender {
