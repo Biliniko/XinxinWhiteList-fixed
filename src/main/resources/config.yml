@@ -1,0 +1,39 @@
+name:
+  ##正则表达式
+  regex: 'a-zA-Z0-9_'
+  ##名字最小长度
+  min_length: 3
+  ##名字最长长度
+  max_length: 16
+#是否强制绑定XinxinBotApi
+#每次玩家进入时都会触发绑定
+force_bind: true
+#玩家退出群是否自动删除他的绑定信息
+kick_unbind: false
+#是否开启等级限制(等级必须大于该值才能申请白名单)
+level_limit_min: 0
+#authme设置
+#如果未安装authme请改为false
+authme:
+  #是否忽略已经注册的玩家
+  ignore: false
+  #是否强制注册(验证成功10分钟后未注册则强制注册,密码随机)
+  force_reg: false
+join_tip:
+  - "&a&l请先加入Q群: 00000"
+  - "&f&l在群内发送此内容: '&c&l%name%&f&l'"
+  - "&f&l即可让当前账号[&b&l%player%&f&l]进入服务器"
+  - "&8&l此验证码有效至: %time%&8&l[到期重新登入获取]"
+  - "&4&l注册完成之前请勿泄露自己用户名!"
+#监听指令的Q群
+groups:
+  - "00000"
+messages:
+  bind: "验证成功!直接进入服务器即可!"
+  fail: "此玩家已经存在,请更换名称"
+  length: "您的名字太长或太短"
+  char: "名字只能使用英文数字和下划线!"
+  invalid_code: "该验证码不存在[请仔细核对]"
+  binded: "您已经验证过玩家: %name%"
+  ipchanged: "&c您的IP地址发生变化,请等待10分钟后再试"
+  level_limit: "你的等级不够无法申请白名单"
