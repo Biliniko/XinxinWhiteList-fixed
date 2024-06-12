@@ -1,0 +1,9 @@
+name: XinxinWhiteList
+version: '${project.version}'
+main: ltd.dreamcraft.xinxinwhitelist.XinxinWhiteList
+api-version: '1.13'
+depend: [ XinxinBotApi ]
+softdepend: [ AuthMe, Essentials , XinxinCustomMessage ]
+commands:
+  xxw:
+    permission: xxw.admin
