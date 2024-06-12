@@ -165,7 +165,7 @@ public class MYSQL implements PlayerData {
     public void removeWhiteListByGroupId(long groupId) {
         Bukkit.getScheduler().runTaskAsynchronously(XinxinWhiteList.getInstance(), () -> {
             AtomicInteger successCount = new AtomicInteger(); // 成功计数器
-            List<GroupMember> groupMemberList = BotActionLocal.getGroupMemberList(Long.parseLong(String.valueOf(groupId)));
+            List<GroupMember> groupMemberList = BotActionLocal.getGroupMemberList(groupId);
             ArrayList<Long> memberIdList = new ArrayList<>();
             for (GroupMember member : groupMemberList) {
                 long userId = member.getUserId();
@@ -180,7 +180,6 @@ public class MYSQL implements PlayerData {
                 while (resultSet.next()) {
                     String playerName = resultSet.getString("name");
                     long qqId = resultSet.getLong("qq");
-
                     if (!memberIdList.contains(qqId)) {
                         boolean b = removePlayerByID(playerName.toLowerCase());
                         if (b) {
@@ -194,6 +193,8 @@ public class MYSQL implements PlayerData {
 
                 if (successCount.get() > 0) {
                     XinxinWhiteList.getInstance().getLogger().info("§a[XXW] §c成功删除了" + successCount.get() + "个玩家的绑定数据");
+                } else {
+                    XinxinWhiteList.getInstance().getLogger().info("§a[XXW] §c未删除任何玩家的绑定数据");
                 }
             } catch (SQLException e) {
                 e.printStackTrace();

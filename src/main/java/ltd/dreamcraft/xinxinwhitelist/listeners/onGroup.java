@@ -48,24 +48,28 @@ public class onGroup implements Listener {
         if (!onJoin.names.containsKey(code)) {
           e.replyMessage(config.getString("messages.invalid_code"));
         } else {
-          int level = getQQLevel(e);
-          System.out.println(level);
-          if (level == -1) {
-            e.replyMessage("功能失效请联系插件作者QQ: 2821396723");
-            return;
+          int levelLimitMin = config.getInt("level_limit_min", 0);
+          if (levelLimitMin != 0) {
+            int level = getQQLevel(e);
+            if (level == -1) {
+              e.replyMessage("功能失效请联系插件作者QQ: 2821396723");
+              return;
+            }
+            if (level < levelLimitMin) {
+              e.replyMessage(config.getString("messages.level_limit", "你的等级不够无法申请白名单"));
+              return;
+            }
           }
-          if (level < config.getInt("level_limit_min", 0)) {
-            e.replyMessage(config.getString("messages.level_limit", "你的等级不够无法申请白名单"));
-            return;
-          }
+
 
           String name = onJoin.names.get(code);
           Map<Boolean, String> bindResult = XinxinWhiteList.getPlayerData().tryBind(qq, name);
           boolean result = bindResult.keySet().stream().findAny().get();
           String msg = bindResult.values().stream().findAny().get();
           onJoin.names.remove(code);
-
-          e.replyMessage(msg);
+          Bukkit.getScheduler().runTaskLaterAsynchronously(XinxinWhiteList.getInstance(), () -> {
+            e.replyMessage(msg);
+          }, 30L);
           if (result) {
             playersMap.add(name);
             String realName = onJoin.nameCache.get(name);
@@ -83,57 +87,52 @@ public class onGroup implements Listener {
   }
 
   private int getQQLevel(GroupMessageEvent event) {
-
     long qq = event.getUser_id();
-    GroupMember groupMemberInfo = BotActionLocal.getGroupMemberInfo(event.getGroup_id(), String.valueOf(event.getUser_id()), true);
+    GroupMember groupMemberInfo = BotActionLocal.getGroupMemberInfo(event.getGroup_id(), event.getUser_id(), true);
     int level = Integer.parseInt(groupMemberInfo.getLevel());
     if (level > 0) {
       return level;
     }
-    try {
-      String urlString = "https://api.52hyjs.com/api/level?qq=" + qq;
-      URL url = new URL(urlString);
-      HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-      conn.setRequestMethod("GET");
-      conn.setRequestProperty("Accept", "application/json");
 
-      if (conn.getResponseCode() != 200) {
-        throw new RuntimeException("HTTP GET Request Failed with Error code : " + conn.getResponseCode());
-      }
+    String urlString = "https://api.52hyjs.com/api/level?qq=" + qq;
+    int maxRetries = 3;
 
-      BufferedReader br = new BufferedReader(new InputStreamReader((conn.getInputStream())));
-      StringBuilder sb = new StringBuilder();
-      String output;
-      while ((output = br.readLine()) != null) {
-        sb.append(output);
-      }
-      conn.disconnect();
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        URL url = new URL(urlString);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setRequestProperty("Accept", "application/json");
 
-      // Debugging statements
-
-      JSONObject json = new JSONObject(sb.toString());
-
-      if (json.has("data")) {
-        JSONObject dataObject = json.getJSONObject("data");
-        if (dataObject != null && dataObject.has("iQQLevel")) {
-          try {
-            return dataObject.getInt("iQQLevel");
-          } catch (NumberFormatException e) {
-            System.out.println("Failed to parse QQ Level as Integer: " + e.getMessage());
-            return -1;  // 表示查询失败
-          }
-        } else {
-          System.out.println("数据对象中没有找到 'iQQLevel'");
-          return -1;  // 表示查询失败
+        if (conn.getResponseCode() != 200) {
+          throw new RuntimeException("HTTP GET Request Failed with Error code : " + conn.getResponseCode());
         }
-      } else {
-        System.out.println("JSON中没有找到 'data' 对象");
-        return -1;  // 表示查询失败
+
+        BufferedReader br = new BufferedReader(new InputStreamReader((conn.getInputStream())));
+        StringBuilder sb = new StringBuilder();
+        String output;
+        while ((output = br.readLine()) != null) {
+          sb.append(output);
+        }
+        conn.disconnect();
+
+        JSONObject json = new JSONObject(sb.toString());
+
+        if (json.has("data")) {
+          JSONObject dataObject = json.getJSONObject("data");
+          if (dataObject != null && dataObject.has("iQQLevel")) {
+            return dataObject.getInt("iQQLevel");
+          }
+        }
+      } catch (Exception e) {
+        e.printStackTrace();
+        if (attempt == maxRetries) {
+          return -1;  // 返回-1表示查询失败
+        }
       }
-    } catch (Exception e) {
-      e.printStackTrace();
-      return -1;  // 返回-1表示查询失败
     }
+
+    return -1;
   }
 
   public static void removePlayer(String name) {
@@ -152,4 +151,6 @@ public class onGroup implements Listener {
       BotBind.unBind(BotBind.getBindQQ(name));
     }
   }
+
+
 }

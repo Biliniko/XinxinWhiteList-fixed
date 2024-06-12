@@ -55,8 +55,6 @@ public class YAML implements PlayerData {
     public YAML() {
         playerData = new CustomConfig("players.yml", XinxinWhiteList.getInstance());
         XinxinWhiteList.getInstance().getLogger().info("Loaded");
-        playerData.save();
-        playerData.reload();
         // 异步定时批处理任务
         Bukkit.getScheduler().runTaskTimerAsynchronously(XinxinWhiteList.getInstance(), () -> {
             List<Runnable> tasksToRun = new ArrayList<>(ioTasks);
@@ -71,9 +69,10 @@ public class YAML implements PlayerData {
         if (playerDataCache.containsKey(playerName)) {
             return playerDataCache.get(playerName).toString();
         } else {
-            Long data = playerData.getConfig().getLong(playerName);
+            long data = playerData.getConfig().getLong(playerName);
             playerDataCache.put(playerName, data);
-            return data.toString();
+            if (data == 0) return null;
+            return Long.toString(data);
         }
     }
 
@@ -176,8 +175,7 @@ public class YAML implements PlayerData {
                 return map;
             }
         }
-        playerData.set(name.toLowerCase(), qq);
-        getPlayerData().save();
+        XinxinWhiteList.playerData.addPlayerData(name.toLowerCase(), qq);
         map.put(true, bind);
         //强制绑定
         BotBind.setBind(String.valueOf(qq), name);

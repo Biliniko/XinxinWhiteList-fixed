@@ -13,17 +13,16 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.File;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class XinxinWhiteList extends JavaPlugin {
   private static XinxinWhiteList instance;
@@ -91,22 +90,42 @@ public class XinxinWhiteList extends JavaPlugin {
 
   @Override
   public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-    if (args.length == 1 && "reload".equalsIgnoreCase(args[0])) {
-      reloadConfig();
-      if ("YAML".equalsIgnoreCase(getConfig().getString("database.type"))) {
-        playerData.reload();
+      if (args.length == 1 && "reload".equalsIgnoreCase(args[0])) {
+          reloadConfig();
+          if ("YAML".equalsIgnoreCase(getConfig().getString("database.type"))) {
+              playerData.reload();
+          }
+          sender.sendMessage("§a[XXW] 配置文件已经重新载入");
+          return true;
       }
-      sender.sendMessage("§a[XXW] 配置文件已经重新载入");
-      return true;
-    }
-    if (args.length == 2 && "check".equalsIgnoreCase(args[0])) {
-      Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
-        String qq = playerData.getPlayerName(args[1].toLowerCase());
-        sender.sendMessage("§a[XXW] 此玩家的QQ为: " + qq);
-      });
-      return true;
-    }
-    if (args.length == 1 && "convert".equalsIgnoreCase(args[0])) {
+      if (args.length == 1 && "convertmysql".equalsIgnoreCase(args[0])) {
+
+          File file = new File(getDataFolder(), "BindData.yml");
+          YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
+
+          if (!file.exists() || config.getKeys(false).isEmpty()) {
+              getLogger().warning("BindData.yml不存在或数据为空.");
+              return false;
+          }
+
+          Set<String> keys = config.getKeys(false);
+          for (String key : keys) {
+              String qq = key;
+              String name = config.getString(key);
+
+              playerData.addPlayerData(name.toLowerCase(), Long.valueOf(qq));
+          }
+          getLogger().info("数据导入完成.");
+
+      }
+      if (args.length == 2 && "check".equalsIgnoreCase(args[0])) {
+          Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+              String qq = playerData.getPlayerName(args[1].toLowerCase());
+              sender.sendMessage("§a[XXW] 此玩家的QQ为: " + qq);
+          });
+          return true;
+      }
+      if (args.length == 1 && "convert".equalsIgnoreCase(args[0])) {
       convertYamlToMysql();
       sender.sendMessage("§a[XXW] 正在将YAML数据转换为MySQL...");
       return true;
@@ -203,7 +222,7 @@ public class XinxinWhiteList extends JavaPlugin {
     if (args.length == 2 && "checkGroup".equalsIgnoreCase(args[0])) {
       if (getConfig().getBoolean("kick_unbind")) {
         try {
-          playerData.removeWhiteListByGroupId(Long.parseLong(args[0]));
+            playerData.removeWhiteListByGroupId(Long.parseLong(args[1]));
         } catch (NumberFormatException e) {
           sender.sendMessage("§a[XXW] §c请输入有效的QQ群号码");
         }

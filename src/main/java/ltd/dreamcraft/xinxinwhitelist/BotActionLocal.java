@@ -34,7 +34,7 @@ public class BotActionLocal {
      * @param auto_escape 是否缓存
      * @return GroupMember对象
      */
-    public static GroupMember getGroupMemberInfo(long group_id, String user_id, boolean... auto_escape) {
+    public static GroupMember getGroupMemberInfo(long group_id, long user_id, boolean... auto_escape) {
         JSONObject data = getData(BotData.getClient().sendData(
                 (new JsonAction("get_group_member_info"))
                         .add("group_id", group_id)
@@ -57,8 +57,8 @@ public class BotActionLocal {
     }
 
     private static GroupMember createGroupMember(JSONObject data) {
-        int groupId = data.getInt("group_id");
-        int userId = data.getInt("user_id");
+        long groupId = data.getLong("group_id");
+        long userId = data.getLong("user_id");
         String nickname = data.getString("nickname");
         String card = data.getString("card");
         String sex = data.getString("sex");
