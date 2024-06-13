@@ -59,7 +59,7 @@ public class onJoin implements Listener {
                     return;
                 }
             }
-            if (XinxinWhiteList.getPlayerData().getConfig().getString(e.getName().toLowerCase()) != null)
+            if (XinxinWhiteList.getPlayerData().getPlayerName(e.getName().toLowerCase()) != null)
                 return;
             int min = config.getInt("name.min_length");
             int max = config.getInt("name.max_length");

@@ -5,10 +5,10 @@ name:
   min_length: 3
   ##名字最长长度
   max_length: 16
-#是否强制绑定XinxinBotApi
+#是否强制绑定XinxinBotAPI
 #每次玩家进入时都会触发绑定
 force_bind: true
-#玩家退出群是否自动删除他的绑定信息
+#玩家退出群是否自动删除他的白名单(不包含XinxinBotAPI)
 kick_unbind: false
 #是否开启等级限制(等级必须大于该值才能申请白名单)
 level_limit_min: 0
@@ -37,3 +37,12 @@ messages:
   binded: "您已经验证过玩家: %name%"
   ipchanged: "&c您的IP地址发生变化,请等待10分钟后再试"
   level_limit: "你的等级不够无法申请白名单"
+database:
+  #数据储存方式 YAML MYSQL
+  type: "YAML"
+  hostname: "127.0.0.1"
+  port: 3306
+  username: "root"
+  password: "123456"
+  database: "xinxin"
+  useSSL: false

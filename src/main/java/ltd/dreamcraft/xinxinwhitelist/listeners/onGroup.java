@@ -18,7 +18,6 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,27 +35,6 @@ public class onGroup implements Listener {
     } catch (Exception var2) {
       return false;
     }
-  }
-
-  public static Map<Boolean, String> tryBind(long qq, String name) {
-    FileConfiguration playerData = XinxinWhiteList.getPlayerData().getConfig();
-    FileConfiguration config = XinxinWhiteList.getInstance().getConfig();
-    Map<Boolean, String> map = new HashMap<>();
-    String bind = config.getString("messages.bind").replace("%name%", name);
-    Set<String> section = playerData.getConfigurationSection("").getKeys(false);
-    for (String playerKey : section) {
-      if (playerData.getLong(playerKey) == qq) {
-        String binded = config.getString("messages.binded").replace("%name%", playerKey);
-        map.put(false, binded);
-        return map;
-      }
-    }
-    playerData.set(name.toLowerCase(), qq);
-    XinxinWhiteList.getPlayerData().save();
-    map.put(true, bind);
-    //强制绑定
-    BotBind.setBind(String.valueOf(qq), name);
-    return map;
   }
 
   @EventHandler
@@ -82,7 +60,7 @@ public class onGroup implements Listener {
           }
 
           String name = onJoin.names.get(code);
-          Map<Boolean, String> bindResult = tryBind(qq, name);
+          Map<Boolean, String> bindResult = XinxinWhiteList.getPlayerData().tryBind(qq, name);
           boolean result = bindResult.keySet().stream().findAny().get();
           String msg = bindResult.values().stream().findAny().get();
           onJoin.names.remove(code);
@@ -168,9 +146,9 @@ public class onGroup implements Listener {
       if (plugin != null) {
         // Essentials插件相关代码
       }
-      FileConfiguration playerData = XinxinWhiteList.getPlayerData().getConfig();
-      playerData.set(name.toLowerCase(), null);
-      XinxinWhiteList.getPlayerData().save();
+//      FileConfiguration playerData = XinxinWhiteList.getPlayerName().getConfig();
+//      playerData.set(name.toLowerCase(), null);
+      XinxinWhiteList.getPlayerData().removePlayerByID(name.toLowerCase());
       BotBind.unBind(BotBind.getBindQQ(name));
     }
   }
