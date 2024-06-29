@@ -52,8 +52,8 @@ public class onGroup implements Listener {
           if (levelLimitMin != 0) {
             int level = getQQLevel(e);
             if (level == -1) {
-              e.replyMessage("功能失效请联系插件作者QQ: 2821396723");
-              return;
+              e.replyMessage("接口失效,请联系群主");
+//              return;
             }
             if (level < levelLimitMin) {
               e.replyMessage(config.getString("messages.level_limit", "你的等级不够无法申请白名单"));
@@ -67,9 +67,7 @@ public class onGroup implements Listener {
           boolean result = bindResult.keySet().stream().findAny().get();
           String msg = bindResult.values().stream().findAny().get();
           onJoin.names.remove(code);
-          Bukkit.getScheduler().runTaskLaterAsynchronously(XinxinWhiteList.getInstance(), () -> {
             e.replyMessage(msg);
-          }, 30L);
           if (result) {
             playersMap.add(name);
             String realName = onJoin.nameCache.get(name);
@@ -88,7 +86,7 @@ public class onGroup implements Listener {
 
   private int getQQLevel(GroupMessageEvent event) {
     long qq = event.getUser_id();
-    GroupMember groupMemberInfo = BotActionLocal.getGroupMemberInfo(event.getGroup_id(), event.getUser_id(), true);
+    GroupMember groupMemberInfo = BotActionLocal.getGroupMemberInfo(event.getGroup_id(), qq, true);
     int level = Integer.parseInt(groupMemberInfo.getLevel());
     if (level > 0) {
       return level;

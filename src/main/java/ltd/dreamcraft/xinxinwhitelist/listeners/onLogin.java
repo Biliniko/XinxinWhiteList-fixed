@@ -42,7 +42,10 @@ public class onLogin implements Listener {
         Bukkit.getScheduler().runTaskAsynchronously(XinxinWhiteList.getInstance(), () -> {
             String qqx = XinxinWhiteList.getPlayerData().getPlayerName(p.getName().toLowerCase());
             if (qqx != null)
-                BotBind.setBind(qqx, p.getName());
+                //1.0.9bug修复
+                if (!BotBind.setBind(qqx, p.getName())) {
+                    BotBind.addBind(qqx, p.getName());
+                }
         });
     }
 

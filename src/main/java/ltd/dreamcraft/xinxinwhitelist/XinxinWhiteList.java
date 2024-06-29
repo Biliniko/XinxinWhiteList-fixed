@@ -90,42 +90,40 @@ public class XinxinWhiteList extends JavaPlugin {
 
   @Override
   public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-      if (args.length == 1 && "reload".equalsIgnoreCase(args[0])) {
-          reloadConfig();
-          if ("YAML".equalsIgnoreCase(getConfig().getString("database.type"))) {
-              playerData.reload();
-          }
-          sender.sendMessage("§a[XXW] 配置文件已经重新载入");
-          return true;
+    if (args.length == 1 && "reload".equalsIgnoreCase(args[0])) {
+      reloadConfig();
+      if ("YAML".equalsIgnoreCase(getConfig().getString("database.type"))) {
+        playerData.reload();
       }
-      if (args.length == 1 && "convertmysql".equalsIgnoreCase(args[0])) {
+      sender.sendMessage("§a[XXW] 配置文件已经重新载入");
+      return true;
+    }
+    if (args.length == 1 && "convertmysql".equalsIgnoreCase(args[0])) {
+      File file = new File(getDataFolder(), "BindData.yml");
+      YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
 
-          File file = new File(getDataFolder(), "BindData.yml");
-          YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-
-          if (!file.exists() || config.getKeys(false).isEmpty()) {
-              getLogger().warning("BindData.yml不存在或数据为空.");
-              return false;
-          }
-
-          Set<String> keys = config.getKeys(false);
-          for (String key : keys) {
-              String qq = key;
-              String name = config.getString(key);
-
-              playerData.addPlayerData(name.toLowerCase(), Long.valueOf(qq));
-          }
-          getLogger().info("数据导入完成.");
-
+      if (!file.exists() || config.getKeys(false).isEmpty()) {
+        getLogger().warning("BindData.yml不存在或数据为空.");
+        return false;
       }
-      if (args.length == 2 && "check".equalsIgnoreCase(args[0])) {
-          Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
-              String qq = playerData.getPlayerName(args[1].toLowerCase());
-              sender.sendMessage("§a[XXW] 此玩家的QQ为: " + qq);
-          });
-          return true;
+
+      Set<String> keys = config.getKeys(false);
+      for (String key : keys) {
+        String qq = key;
+        String name = config.getString(key);
+        playerData.addPlayerData(name.toLowerCase(), Long.valueOf(qq));
       }
-      if (args.length == 1 && "convert".equalsIgnoreCase(args[0])) {
+      getLogger().info("数据导入完成.");
+      return true;
+    }
+    if (args.length == 2 && "check".equalsIgnoreCase(args[0])) {
+      Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+        String qq = playerData.getPlayerName(args[1].toLowerCase());
+        sender.sendMessage("§a[XXW] 此玩家的QQ为: " + qq);
+      });
+      return true;
+    }
+    if (args.length == 1 && "convert".equalsIgnoreCase(args[0])) {
       convertYamlToMysql();
       sender.sendMessage("§a[XXW] 正在将YAML数据转换为MySQL...");
       return true;
@@ -222,10 +220,38 @@ public class XinxinWhiteList extends JavaPlugin {
     if (args.length == 2 && "checkGroup".equalsIgnoreCase(args[0])) {
       if (getConfig().getBoolean("kick_unbind")) {
         try {
-            playerData.removeWhiteListByGroupId(Long.parseLong(args[1]));
+          playerData.removeWhiteListByGroupId(Long.parseLong(args[1]));
         } catch (NumberFormatException e) {
           sender.sendMessage("§a[XXW] §c请输入有效的QQ群号码");
         }
+      }
+      return true;
+    }
+    // 添加 ban 命令
+    if (args.length == 2 && "ban".equalsIgnoreCase(args[0])) {
+      try {
+        long qq = Long.parseLong(args[1]);
+        if (playerData.banQQ(qq)) {
+          sender.sendMessage("§a[XXW] QQ " + qq + " 已被封禁");
+        } else {
+          sender.sendMessage("§a[XXW] §c封禁失败");
+        }
+      } catch (NumberFormatException e) {
+        sender.sendMessage("§a[XXW] §c请输入有效的QQ号码");
+      }
+      return true;
+    }
+    // 添加 unban 命令
+    if (args.length == 2 && "unban".equalsIgnoreCase(args[0])) {
+      try {
+        long qq = Long.parseLong(args[1]);
+        if (playerData.unbanQQ(qq)) {
+          sender.sendMessage("§a[XXW] QQ " + qq + " 已被解封");
+        } else {
+          sender.sendMessage("§a[XXW] §c解封失败");
+        }
+      } catch (NumberFormatException e) {
+        sender.sendMessage("§a[XXW] §c请输入有效的QQ号码");
       }
       return true;
     }
@@ -239,10 +265,11 @@ public class XinxinWhiteList extends JavaPlugin {
     sender.sendMessage("§c/xxw delete [玩家] —— 删除玩家绑定数据");
     sender.sendMessage("§c/xxw deleteByQQ [QQ] —— 删除玩家绑定数据");
     sender.sendMessage("§c/xxw convert —— 将YAML数据转换为MySQL");
-    sender.sendMessage("§c注意！！！所有涉及绑定解绑白名单的操作都会有延迟(1min)仅限于yaml");
+    sender.sendMessage("§c/xxw ban [QQ] —— 封禁QQ[MYSQL]");
+    sender.sendMessage("§c/xxw unban [QQ] —— 解封QQ[MYSQL]");
+    sender.sendMessage("§c注意！！！所有涉及绑定解绑白名单的命令均为异步，重载配置为同步命令。");
     return true;
   }
-
   public void convertYamlToMysql() {
     Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
       FileConfiguration playerDataTemp = new CustomConfig("players.yml", XinxinWhiteList.getInstance()).getConfig();

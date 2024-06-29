@@ -23,4 +23,10 @@ public interface PlayerData {
     void reload();
 
     Map<Boolean, String> tryBind(long qq, String name);
+
+    boolean checkIsBaned(long qq);
+
+    boolean banQQ(long qq);
+
+    boolean unbanQQ(long qq);
 }

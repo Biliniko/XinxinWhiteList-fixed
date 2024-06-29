@@ -49,6 +49,7 @@ public class MYSQL implements PlayerData {
             connection = DriverManager.getConnection(url, username, password);
             try (Statement statement = connection.createStatement()) {
                 statement.executeUpdate("CREATE TABLE IF NOT EXISTS xxw_players (name VARCHAR(255), qq VARCHAR(255))");
+                statement.executeUpdate("CREATE TABLE IF NOT EXISTS xxw_blackplayers (id INT PRIMARY KEY, qq VARCHAR(255) UNIQUE)");
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -185,6 +186,10 @@ public class MYSQL implements PlayerData {
                         if (b) {
                             successCount.getAndIncrement(); // 每次成功删除时递增计数器
                             XinxinWhiteList.getInstance().getLogger().info("§a[XXW] §c玩家" + playerName + "的绑定数据已经成功删除");
+                            //黑名单定制功能
+                            if (!checkIsBaned(qqId)) {
+                                banQQ(qqId);
+                            }
                         } else {
                             XinxinWhiteList.getInstance().getLogger().warning("§a[XXW] §c玩家" + playerName + "的绑定数据删除失败");
                         }
@@ -224,6 +229,12 @@ public class MYSQL implements PlayerData {
                         return map;
                     }
                 }
+                //定制内容 如果被封禁qq就返回失败
+                if (checkIsBaned(qq)) {
+                    map.put(false, "你的qq被列入了黑名单，可找群主申请解封。");
+                    return map;
+                }
+                //定制内容 如果被封禁qq就返回失败
                 addPlayerData(name.toLowerCase(), qq);
                 String bind = XinxinWhiteList.getInstance().getConfig().getString("messages.bind");
                 map.put(true, bind);
@@ -235,4 +246,54 @@ public class MYSQL implements PlayerData {
         }
         return map;
     }
+
+    @Override
+    public boolean checkIsBaned(long qq) {
+        try {
+            checkConnection();
+            String sql = "SELECT * FROM xxw_blackplayers WHERE qq = ?";
+            try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+                preparedStatement.setLong(1, qq);
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                    return resultSet.next();
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean banQQ(long qq) {
+        try {
+            checkConnection();
+            String sql = "INSERT INTO xxw_blackplayers (qq) values (?)";
+            try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+                preparedStatement.setLong(1, qq);
+                int i = preparedStatement.executeUpdate(sql);
+                return i > 0;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean unbanQQ(long qq) {
+        try {
+            checkConnection();
+            String sql = "DELETE FROM xxw_blackplayers WHERE qq = ?";
+            try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+                preparedStatement.setLong(1, qq);
+                int rowsAffected = preparedStatement.executeUpdate();
+                return rowsAffected > 0;  // 如果删除了记录，则返回 true
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;  // 删除失败时返回 false
+    }
+
 }

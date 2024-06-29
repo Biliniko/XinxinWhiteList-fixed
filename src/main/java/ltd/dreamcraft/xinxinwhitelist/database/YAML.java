@@ -183,6 +183,21 @@ public class YAML implements PlayerData {
     }
 
     @Override
+    public boolean checkIsBaned(long qq) {
+        return false;
+    }
+
+    @Override
+    public boolean banQQ(long qq) {
+        return false;
+    }
+
+    @Override
+    public boolean unbanQQ(long qq) {
+        return false;
+    }
+
+    @Override
     public void reload() {
         if ("YAML".equalsIgnoreCase(XinxinWhiteList.getInstance().getConfig().getString("database.type"))) {
             playerData.reload();
