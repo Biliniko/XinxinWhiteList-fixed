@@ -145,6 +145,7 @@ public class XinxinWhiteList extends JavaPlugin {
           String playerName = BotBind.getBindPlayerName(args[1]);
           sender.sendMessage("§a[XXW] 此QQ所绑定的玩家为: " + Bukkit.getOfflinePlayer(playerName).getName());
         } catch (Exception e) {
+          e.printStackTrace();
           sender.sendMessage("§a[XXW] §c发生错误!");
         }
       });
