@@ -18,7 +18,6 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,27 +37,6 @@ public class onGroup implements Listener {
     }
   }
 
-  public static Map<Boolean, String> tryBind(long qq, String name) {
-    FileConfiguration playerData = XinxinWhiteList.getPlayerData().getConfig();
-    FileConfiguration config = XinxinWhiteList.getInstance().getConfig();
-    Map<Boolean, String> map = new HashMap<>();
-    String bind = config.getString("messages.bind").replace("%name%", name);
-    Set<String> section = playerData.getConfigurationSection("").getKeys(false);
-    for (String playerKey : section) {
-      if (playerData.getLong(playerKey) == qq) {
-        String binded = config.getString("messages.binded").replace("%name%", playerKey);
-        map.put(false, binded);
-        return map;
-      }
-    }
-    playerData.set(name.toLowerCase(), qq);
-    XinxinWhiteList.getPlayerData().save();
-    map.put(true, bind);
-    //强制绑定
-    BotBind.setBind(String.valueOf(qq), name);
-    return map;
-  }
-
   @EventHandler
   public void onGroupMsg(GroupMessageEvent e) {
     FileConfiguration config = XinxinWhiteList.getInstance().getConfig();
@@ -70,24 +48,26 @@ public class onGroup implements Listener {
         if (!onJoin.names.containsKey(code)) {
           e.replyMessage(config.getString("messages.invalid_code"));
         } else {
-          int level = getQQLevel(e);
-          System.out.println(level);
-          if (level == -1) {
-            e.replyMessage("功能失效请联系插件作者QQ: 2821396723");
-            return;
-          }
-          if (level < config.getInt("level_limit_min", 0)) {
-            e.replyMessage(config.getString("messages.level_limit", "你的等级不够无法申请白名单"));
-            return;
+          int levelLimitMin = config.getInt("level_limit_min", 0);
+          if (levelLimitMin != 0) {
+            int level = getQQLevel(e);
+            if (level == -1) {
+              e.replyMessage("接口失效,请联系群主");
+//              return;
+            }
+            if (level < levelLimitMin) {
+              e.replyMessage(config.getString("messages.level_limit", "你的等级不够无法申请白名单"));
+              return;
+            }
           }
 
+
           String name = onJoin.names.get(code);
-          Map<Boolean, String> bindResult = tryBind(qq, name);
+          Map<Boolean, String> bindResult = XinxinWhiteList.getPlayerData().tryBind(qq, name);
           boolean result = bindResult.keySet().stream().findAny().get();
           String msg = bindResult.values().stream().findAny().get();
           onJoin.names.remove(code);
-
-          e.replyMessage(msg);
+            e.replyMessage(msg);
           if (result) {
             playersMap.add(name);
             String realName = onJoin.nameCache.get(name);
@@ -105,57 +85,52 @@ public class onGroup implements Listener {
   }
 
   private int getQQLevel(GroupMessageEvent event) {
-
     long qq = event.getUser_id();
-    GroupMember groupMemberInfo = BotActionLocal.getGroupMemberInfo(event.getGroup_id(), String.valueOf(event.getUser_id()), true);
+    GroupMember groupMemberInfo = BotActionLocal.getGroupMemberInfo(event.getGroup_id(), qq, true);
     int level = Integer.parseInt(groupMemberInfo.getLevel());
     if (level > 0) {
       return level;
     }
-    try {
-      String urlString = "https://api.52hyjs.com/api/level?qq=" + qq;
-      URL url = new URL(urlString);
-      HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-      conn.setRequestMethod("GET");
-      conn.setRequestProperty("Accept", "application/json");
 
-      if (conn.getResponseCode() != 200) {
-        throw new RuntimeException("HTTP GET Request Failed with Error code : " + conn.getResponseCode());
-      }
+    String urlString = "https://api.52hyjs.com/api/level?qq=" + qq;
+    int maxRetries = 3;
 
-      BufferedReader br = new BufferedReader(new InputStreamReader((conn.getInputStream())));
-      StringBuilder sb = new StringBuilder();
-      String output;
-      while ((output = br.readLine()) != null) {
-        sb.append(output);
-      }
-      conn.disconnect();
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        URL url = new URL(urlString);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setRequestProperty("Accept", "application/json");
 
-      // Debugging statements
-
-      JSONObject json = new JSONObject(sb.toString());
-
-      if (json.has("data")) {
-        JSONObject dataObject = json.getJSONObject("data");
-        if (dataObject != null && dataObject.has("iQQLevel")) {
-          try {
-            return dataObject.getInt("iQQLevel");
-          } catch (NumberFormatException e) {
-            System.out.println("Failed to parse QQ Level as Integer: " + e.getMessage());
-            return -1;  // 表示查询失败
-          }
-        } else {
-          System.out.println("数据对象中没有找到 'iQQLevel'");
-          return -1;  // 表示查询失败
+        if (conn.getResponseCode() != 200) {
+          throw new RuntimeException("HTTP GET Request Failed with Error code : " + conn.getResponseCode());
         }
-      } else {
-        System.out.println("JSON中没有找到 'data' 对象");
-        return -1;  // 表示查询失败
+
+        BufferedReader br = new BufferedReader(new InputStreamReader((conn.getInputStream())));
+        StringBuilder sb = new StringBuilder();
+        String output;
+        while ((output = br.readLine()) != null) {
+          sb.append(output);
+        }
+        conn.disconnect();
+
+        JSONObject json = new JSONObject(sb.toString());
+
+        if (json.has("data")) {
+          JSONObject dataObject = json.getJSONObject("data");
+          if (dataObject != null && dataObject.has("iQQLevel")) {
+            return dataObject.getInt("iQQLevel");
+          }
+        }
+      } catch (Exception e) {
+        e.printStackTrace();
+        if (attempt == maxRetries) {
+          return -1;  // 返回-1表示查询失败
+        }
       }
-    } catch (Exception e) {
-      e.printStackTrace();
-      return -1;  // 返回-1表示查询失败
     }
+
+    return -1;
   }
 
   public static void removePlayer(String name) {
@@ -168,10 +143,12 @@ public class onGroup implements Listener {
       if (plugin != null) {
         // Essentials插件相关代码
       }
-      FileConfiguration playerData = XinxinWhiteList.getPlayerData().getConfig();
-      playerData.set(name.toLowerCase(), null);
-      XinxinWhiteList.getPlayerData().save();
+//      FileConfiguration playerData = XinxinWhiteList.getPlayerName().getConfig();
+//      playerData.set(name.toLowerCase(), null);
+      XinxinWhiteList.getPlayerData().removePlayerByID(name.toLowerCase());
       BotBind.unBind(BotBind.getBindQQ(name));
     }
   }
+
+
 }

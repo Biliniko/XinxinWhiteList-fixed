@@ -3,7 +3,6 @@ package ltd.dreamcraft.xinxinwhitelist.beans;
 /**
  * @author haishen668
  * @version 1.0
- * @description: TODO
  * @date 2024/4/11 10:17
  */
 public class GroupMember {

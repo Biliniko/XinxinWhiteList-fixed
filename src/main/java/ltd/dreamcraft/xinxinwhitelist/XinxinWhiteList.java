@@ -2,7 +2,9 @@ package ltd.dreamcraft.xinxinwhitelist;
 
 import com.xinxin.BotApi.BotBind;
 import ltd.dreamcraft.xinxinwhitelist.beans.CustomConfig;
-import ltd.dreamcraft.xinxinwhitelist.beans.GroupMember;
+import ltd.dreamcraft.xinxinwhitelist.database.MYSQL;
+import ltd.dreamcraft.xinxinwhitelist.database.PlayerData;
+import ltd.dreamcraft.xinxinwhitelist.database.YAML;
 import ltd.dreamcraft.xinxinwhitelist.listeners.onGroup;
 import ltd.dreamcraft.xinxinwhitelist.listeners.onJoin;
 import ltd.dreamcraft.xinxinwhitelist.listeners.onLogin;
@@ -11,19 +13,20 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.io.File;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.*;
 
 public class XinxinWhiteList extends JavaPlugin {
   private static XinxinWhiteList instance;
-  private static CustomConfig playerData;
+
   private static CustomConfig mysqlSettings;
   private static Map<String, Long> playerDataCache = new HashMap<>();
   private static List<Runnable> ioTasks = new ArrayList<>();
@@ -32,8 +35,14 @@ public class XinxinWhiteList extends JavaPlugin {
     return instance;
   }
 
-  public static CustomConfig getPlayerData() {
+  public static PlayerData playerData;
+
+  public static PlayerData getPlayerData() {
     return playerData;
+  }
+
+  public static void setPlayerData(PlayerData playerData) {
+    XinxinWhiteList.playerData = playerData;
   }
 
   public static CustomConfig getMysqlSettings() {
@@ -56,10 +65,6 @@ public class XinxinWhiteList extends JavaPlugin {
     registerEvent(new onJoin());
     registerEvent(new onGroup());
     registerEvent(new onLogin());
-    playerData = new CustomConfig("players.yml", this);
-    getLogger().info("Loaded");
-    playerData.save();
-    playerData.reload();
 
     Bukkit.getScheduler().runTaskTimer(this, () -> {
       if (System.currentTimeMillis() - onLogin.last > 2000L) {
@@ -72,15 +77,11 @@ public class XinxinWhiteList extends JavaPlugin {
         onLogin.admins.add(p.getUniqueId());
       }
     }
-
-    // 异步定时批处理任务
-    Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
-      List<Runnable> tasksToRun = new ArrayList<>(ioTasks);
-      ioTasks.clear();
-      for (Runnable task : tasksToRun) {
-        task.run();
-      }
-    }, 20L * 60, 20L * 60); // 每分钟运行一次
+    if ("yaml".equalsIgnoreCase(getConfig().getString("database.type"))) {
+      playerData = new YAML();
+    } else if ("mysql".equalsIgnoreCase(getConfig().getString("database.type"))) {
+      playerData = new MYSQL();
+    }
   }
 
   private void registerEvent(Listener l) {
@@ -91,20 +92,45 @@ public class XinxinWhiteList extends JavaPlugin {
   public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
     if (args.length == 1 && "reload".equalsIgnoreCase(args[0])) {
       reloadConfig();
-      playerData.reload();
+      if ("YAML".equalsIgnoreCase(getConfig().getString("database.type"))) {
+        playerData.reload();
+      }
       sender.sendMessage("§a[XXW] 配置文件已经重新载入");
+      return true;
+    }
+    if (args.length == 1 && "convertmysql".equalsIgnoreCase(args[0])) {
+      File file = new File(getDataFolder(), "BindData.yml");
+      YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
+
+      if (!file.exists() || config.getKeys(false).isEmpty()) {
+        getLogger().warning("BindData.yml不存在或数据为空.");
+        return false;
+      }
+
+      Set<String> keys = config.getKeys(false);
+      for (String key : keys) {
+        String qq = key;
+        String name = config.getString(key);
+        playerData.addPlayerData(name.toLowerCase(), Long.valueOf(qq));
+      }
+      getLogger().info("数据导入完成.");
       return true;
     }
     if (args.length == 2 && "check".equalsIgnoreCase(args[0])) {
       Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
-        String qq = getPlayerData(args[1].toLowerCase());
+        String qq = playerData.getPlayerName(args[1].toLowerCase());
         sender.sendMessage("§a[XXW] 此玩家的QQ为: " + qq);
       });
       return true;
     }
+    if (args.length == 1 && "convert".equalsIgnoreCase(args[0])) {
+      convertYamlToMysql();
+      sender.sendMessage("§a[XXW] 正在将YAML数据转换为MySQL...");
+      return true;
+    }
     if (args.length == 2 && "qq".equalsIgnoreCase(args[0])) {
       Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
-        String player = getPlayerByQQ(args[1]);
+        String player = playerData.getPlayerByQQ(args[1]);
         if (player != null) {
           sender.sendMessage("§a[XXW] 此QQ用户所绑定的玩家为: " + player);
         } else {
@@ -119,6 +145,7 @@ public class XinxinWhiteList extends JavaPlugin {
           String playerName = BotBind.getBindPlayerName(args[1]);
           sender.sendMessage("§a[XXW] 此QQ所绑定的玩家为: " + Bukkit.getOfflinePlayer(playerName).getName());
         } catch (Exception e) {
+          e.printStackTrace();
           sender.sendMessage("§a[XXW] §c发生错误!");
         }
       });
@@ -140,7 +167,7 @@ public class XinxinWhiteList extends JavaPlugin {
         try {
           String name = args[1].toLowerCase();
           Long newQQ = Long.parseLong(args[2]);
-          modifyPlayerData(name, newQQ);
+          playerData.modifyPlayerData(name, newQQ);
           sender.sendMessage("§a[XXW] §a玩家" + name + "的QQ已经成功更改为: " + newQQ);
         } catch (NumberFormatException e) {
           sender.sendMessage("§a[XXW] §c请输入数字");
@@ -153,11 +180,11 @@ public class XinxinWhiteList extends JavaPlugin {
         try {
           String name = args[1].toLowerCase();
           Long qq = Long.parseLong(args[2]);
-          if (getPlayerByQQ(qq.toString()) == null) {
-            addPlayerData(name, qq);
+          if (playerData.getPlayerByQQ(String.valueOf(qq)) == null && playerData.getPlayerName(name) == null) {
+            playerData.addPlayerData(name, qq);
             sender.sendMessage("§a[XXW] §a玩家" + name + "和QQ: " + qq + "已经成功绑定");
           } else {
-            sender.sendMessage("§a[XXW] §c此QQ已经绑定玩家");
+            sender.sendMessage("§a[XXW] §c此QQ已经绑定玩家或者该玩家已被其他人绑定");
           }
         } catch (NumberFormatException e) {
           sender.sendMessage("§a[XXW] §c请输入数字");
@@ -168,7 +195,7 @@ public class XinxinWhiteList extends JavaPlugin {
     if (args.length == 2 && "delete".equalsIgnoreCase(args[0])) {
       Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
         String name = args[1].toLowerCase();
-        if (removePlayerData(name)) {
+        if (playerData.removePlayerByID(name)) {
           sender.sendMessage("§a[XXW] §c玩家" + name + "的绑定数据已经成功删除");
         } else {
           sender.sendMessage("§a[XXW] §c玩家" + name + "没有绑定过QQ");
@@ -180,7 +207,7 @@ public class XinxinWhiteList extends JavaPlugin {
       Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
         try {
           long qq = Long.parseLong(args[1]);
-          if (removePlayerDataByQQ(qq)) {
+          if (playerData.removePlayerDataByQQ(qq)) {
             sender.sendMessage("§a[XXW] §cQQ" + qq + "绑定的玩家数据已经成功删除");
           } else {
             sender.sendMessage("§a[XXW] §cQQ" + qq + "没有绑定过玩家");
@@ -192,34 +219,40 @@ public class XinxinWhiteList extends JavaPlugin {
       return true;
     }
     if (args.length == 2 && "checkGroup".equalsIgnoreCase(args[0])) {
-      AtomicInteger successCount = new AtomicInteger(); // 成功计数器
       if (getConfig().getBoolean("kick_unbind")) {
-        Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
-          try {
-            List<GroupMember> groupMemberList = BotActionLocal.getGroupMemberList(Long.parseLong(args[1]));
-            ArrayList<Long> memberIdList = new ArrayList<>();
-            for (GroupMember member : groupMemberList) {
-              long userId = member.getUserId();
-              memberIdList.add(userId);
-            }
-            FileConfiguration config = playerData.getConfig();
-            for (String playerName : config.getKeys(false)) {
-              long qqId = config.getLong(playerName.toLowerCase());
-              if (!memberIdList.contains(qqId)) {
-                boolean b = removePlayerData(playerName.toLowerCase());
-                if (b) {
-                  successCount.getAndIncrement(); // 每次成功删除时 递增计数器
-                  getLogger().info("§a[XXW] §c玩家" + playerName + "的绑定数据已经成功删除");
-                } else {
-                  getLogger().warning("§a[XXW] §c玩家" + playerName + "的绑定数据删除失败");
-                }
-              }
-            }
-          } catch (NumberFormatException e) {
-            sender.sendMessage("§a[XXW] §c请输入有效的QQ群号码");
-          }
-          getLogger().info("§a[XXW] §c成功删除的玩家数据总数: " + successCount);
-        });
+        try {
+          playerData.removeWhiteListByGroupId(Long.parseLong(args[1]));
+        } catch (NumberFormatException e) {
+          sender.sendMessage("§a[XXW] §c请输入有效的QQ群号码");
+        }
+      }
+      return true;
+    }
+    // 添加 ban 命令
+    if (args.length == 2 && "ban".equalsIgnoreCase(args[0])) {
+      try {
+        long qq = Long.parseLong(args[1]);
+        if (playerData.banQQ(qq)) {
+          sender.sendMessage("§a[XXW] QQ " + qq + " 已被封禁");
+        } else {
+          sender.sendMessage("§a[XXW] §c封禁失败");
+        }
+      } catch (NumberFormatException e) {
+        sender.sendMessage("§a[XXW] §c请输入有效的QQ号码");
+      }
+      return true;
+    }
+    // 添加 unban 命令
+    if (args.length == 2 && "unban".equalsIgnoreCase(args[0])) {
+      try {
+        long qq = Long.parseLong(args[1]);
+        if (playerData.unbanQQ(qq)) {
+          sender.sendMessage("§a[XXW] QQ " + qq + " 已被解封");
+        } else {
+          sender.sendMessage("§a[XXW] §c解封失败");
+        }
+      } catch (NumberFormatException e) {
+        sender.sendMessage("§a[XXW] §c请输入有效的QQ号码");
       }
       return true;
     }
@@ -232,80 +265,47 @@ public class XinxinWhiteList extends JavaPlugin {
     sender.sendMessage("§a/xxw forcebind [玩家] [QQ] —— 手动增加新的玩家和QQ数据");
     sender.sendMessage("§c/xxw delete [玩家] —— 删除玩家绑定数据");
     sender.sendMessage("§c/xxw deleteByQQ [QQ] —— 删除玩家绑定数据");
-    sender.sendMessage("§c注意！！！所有涉及绑定解绑白名单的操作都会有延迟(1min)");
+    sender.sendMessage("§c/xxw convert —— 将YAML数据转换为MySQL");
+    sender.sendMessage("§c/xxw ban [QQ] —— 封禁QQ[MYSQL]");
+    sender.sendMessage("§c/xxw unban [QQ] —— 解封QQ[MYSQL]");
+    sender.sendMessage("§c注意！！！所有涉及绑定解绑白名单的命令均为异步，重载配置为同步命令。");
     return true;
   }
-
-  private void flushCache() {
-    // 批量保存缓存中的数据
+  public void convertYamlToMysql() {
     Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
-      for (Map.Entry<String, Long> entry : playerDataCache.entrySet()) {
-        playerData.getConfig().set(entry.getKey(), entry.getValue());
+      FileConfiguration playerDataTemp = new CustomConfig("players.yml", XinxinWhiteList.getInstance()).getConfig();
+      List<String> playerNames = new ArrayList<>(playerDataTemp.getKeys(false));
+      if (!playerNames.isEmpty()) {
+        try (Connection connection = MYSQL.getConnection()) {
+          connection.setAutoCommit(false); // 开启事务
+          String sql = "INSERT INTO xxw_players (name, qq) VALUES (?, ?)";
+          try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            for (String playerName : playerNames) {
+              long qqId = playerDataTemp.getLong(playerName.toLowerCase());
+              pstmt.setString(1, playerName.toLowerCase());
+              pstmt.setLong(2, qqId);
+              pstmt.addBatch();
+            }
+            pstmt.executeBatch(); // 执行批量插入
+          }
+          connection.commit(); // 提交事务
+          getLogger().info("§a[XXW] §cYAML数据已成功转换为MySQL");
+        } catch (SQLException e) {
+          getLogger().severe("§a[XXW] §cYAML数据转换为MySQL失败: " + e.getMessage());
+        }
       }
-      playerData.save();
     });
   }
 
-  private String getPlayerData(String playerName) {
-    if (playerDataCache.containsKey(playerName)) {
-      return playerDataCache.get(playerName).toString();
-    } else {
-      Long data = playerData.getConfig().getLong(playerName);
-      playerDataCache.put(playerName, data);
-      return data.toString();
-    }
-  }
 
-  private void modifyPlayerData(String playerName, Long newQQ) {
-    playerDataCache.put(playerName, newQQ);
-    ioTasks.add(() -> {
-      playerData.getConfig().set(playerName, newQQ);
-      playerData.save();
-    });
-  }
+//  private void flushCache() {
+//    // 批量保存缓存中的数据
+//    Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+//      for (Map.Entry<String, Long> entry : playerDataCache.entrySet()) {
+//        playerData.getConfig().set(entry.getKey(), entry.getValue());
+//      }
+//      playerData.save();
+//    });
+//  }
 
-  private String getPlayerByQQ(String qq) {
-    for (String key : playerData.getConfig().getConfigurationSection("").getKeys(false)) {
-      if (playerData.getConfig().getString(key).equalsIgnoreCase(qq)) {
-        return key;
-      }
-    }
-    return null;
-  }
-
-  public static void addPlayerData(String playerName, Long qq) {
-    playerDataCache.put(playerName, qq);
-    ioTasks.add(() -> {
-      playerData.getConfig().set(playerName, qq);
-      playerData.save();
-    });
-  }
-
-  public static boolean removePlayerData(String playerName) {
-    for (String key : playerData.getConfig().getConfigurationSection("").getKeys(false)) {
-      if (key.equalsIgnoreCase(playerName)) {
-        playerDataCache.remove(key);
-        ioTasks.add(() -> {
-          playerData.getConfig().set(key, null);
-          playerData.save();
-        });
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private boolean removePlayerDataByQQ(long qq) {
-    for (String key : playerData.getConfig().getConfigurationSection("").getKeys(false)) {
-      if (playerData.getConfig().getLong(key) == qq) {
-        playerDataCache.remove(key);
-        ioTasks.add(() -> {
-          playerData.getConfig().set(key, null);
-          playerData.save();
-        });
-        return true;
-      }
-    }
-    return false;
-  }
 }

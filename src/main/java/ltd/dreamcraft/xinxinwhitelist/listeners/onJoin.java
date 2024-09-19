@@ -21,10 +21,10 @@ public class onJoin implements Listener {
     public static ConcurrentHashMap<String, String> ipCache = new ConcurrentHashMap<>();
     public static ConcurrentHashMap<String, String> times = new ConcurrentHashMap<>();
 
-    private static String genCode(int length) {
+    private static String genCode() {
         String words = "0123456789";
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < 4; i++) {
             int random = (new Random()).nextInt(words.length());
             sb.append(words.toCharArray()[random]);
         }
@@ -59,8 +59,9 @@ public class onJoin implements Listener {
                     return;
                 }
             }
-            if (XinxinWhiteList.getPlayerData().getConfig().getString(e.getName().toLowerCase()) != null)
+            if (XinxinWhiteList.getPlayerData().getPlayerName(e.getName().toLowerCase()) != null && !"0".equalsIgnoreCase(XinxinWhiteList.getPlayerData().getPlayerName(e.getName().toLowerCase()))) {
                 return;
+            }
             int min = config.getInt("name.min_length");
             int max = config.getInt("name.max_length");
             if (e.getName().length() < min || e.getName().length() > max) {
@@ -107,24 +108,9 @@ public class onJoin implements Listener {
     }
 
     private String generateCode() {
-        String code;
-        if (names.size() < 20) {
-            code = genCode(4);
-        } else if (names.size() < 200) {
-            code = genCode(5);
-        } else if (names.size() < 2000) {
-            code = genCode(6);
-        } else if (names.size() < 5000) {
-            code = genCode(7);
-        } else if (names.size() < 10000) {
-            code = genCode(8);
-        } else if (names.size() < 50000) {
-            code = genCode(9);
-        } else {
-            code = genCode(10);
-        }
+        String code = genCode(); // 生成四位数的随机code
         while (names.containsKey(code)) {
-            code = genCode(code.length() + 1);
+            code = genCode(); // 重新生成直到code不重复
         }
         return code;
     }

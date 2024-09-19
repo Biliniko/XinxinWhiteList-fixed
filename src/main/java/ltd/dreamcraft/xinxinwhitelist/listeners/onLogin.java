@@ -40,9 +40,12 @@ public class onLogin implements Listener {
         if (!XinxinWhiteList.getInstance().getConfig().getBoolean("force_bind"))
             return;
         Bukkit.getScheduler().runTaskAsynchronously(XinxinWhiteList.getInstance(), () -> {
-            String qqx = XinxinWhiteList.getPlayerData().getConfig().getString(p.getName().toLowerCase());
+            String qqx = XinxinWhiteList.getPlayerData().getPlayerName(p.getName().toLowerCase());
             if (qqx != null)
-                BotBind.setBind(qqx, p.getName());
+                //1.0.9bug修复
+                if (!BotBind.setBind(qqx, p.getName())) {
+                    BotBind.addBind(qqx, p.getName());
+                }
         });
     }
 
@@ -67,7 +70,7 @@ public class onLogin implements Listener {
 //      for (String groupId : XinxinWhiteList.getInstance().getConfig().getStringList("groups")) {
 //          GroupMembersList = BotActionLocal.getGroupMemberList(Long.parseLong(groupId));
 //      }
-//      CustomConfig playerData = XinxinWhiteList.getPlayerData();
+//      CustomConfig playerData = XinxinWhiteList.getPlayerName();
 //      FileConfiguration config = playerData.getConfig();
 //      String string = config.getString(e.getName().toLowerCase());
 //      for (GroupMember member : GroupMembersList) {
@@ -75,7 +78,7 @@ public class onLogin implements Listener {
 //          return;
 //      }
 //      //进行账号踢出
-//      XinxinWhiteList.removePlayerData(e.getName());
+//      XinxinWhiteList.removePlayerByID(e.getName());
 //      e.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, "§b§l你不在交流群中已删除你的白名单");
 //    }
 //
