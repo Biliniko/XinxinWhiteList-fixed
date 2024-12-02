@@ -17,14 +17,6 @@ import java.util.List;
  * @date 2024/4/11 9:56
  */
 public class BotActionLocal {
-    public long sendPrivateMessage(long user_id, String message, boolean... auto_escape) {
-        return this.getData(BotData.getClient().sendData(
-                        (new JsonAction("send_private_msg"))
-                                .add("user_id", user_id)
-                                .add("message", message)
-                                .add("auto_escape", auto_escape), true))
-                .getInt("message_id");
-    }
 
     /**
      * 获取群成员信息
@@ -34,7 +26,7 @@ public class BotActionLocal {
      * @param auto_escape 是否缓存
      * @return GroupMember对象
      */
-    public static GroupMember getGroupMemberInfo(long group_id, long user_id, boolean... auto_escape) {
+    public static GroupMember getGroupMemberInfo(long group_id, long user_id, boolean auto_escape) {
         JSONObject data = getData(BotData.getClient().sendData(
                 (new JsonAction("get_group_member_info"))
                         .add("group_id", group_id)
