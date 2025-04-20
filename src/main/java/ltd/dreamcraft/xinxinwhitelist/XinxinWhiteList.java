@@ -2,6 +2,7 @@ package ltd.dreamcraft.xinxinwhitelist;
 
 import com.xinxin.BotApi.BotBind;
 import ltd.dreamcraft.xinxinwhitelist.beans.CustomConfig;
+import ltd.dreamcraft.xinxinwhitelist.beans.GroupMember;
 import ltd.dreamcraft.xinxinwhitelist.database.MYSQL;
 import ltd.dreamcraft.xinxinwhitelist.database.PlayerData;
 import ltd.dreamcraft.xinxinwhitelist.database.YAML;
@@ -18,7 +19,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -256,6 +262,37 @@ public class XinxinWhiteList extends JavaPlugin {
       }
       return true;
     }
+    // 测试QQ等级命令
+    if (args.length >= 2 && "testqqlevel".equalsIgnoreCase(args[0])) {
+      try {
+        final long qq = Long.parseLong(args[1]);
+        final Long groupId;
+        
+        // 初始化群号
+        if (args.length >= 3) {
+          Long tempGroupId = null;
+          try {
+            tempGroupId = Long.parseLong(args[2]);
+          } catch (NumberFormatException e) {
+            sender.sendMessage("§a[XXW] §c群号格式不正确，将跳过群成员API测试");
+          }
+          groupId = tempGroupId;
+        } else {
+          groupId = null;
+        }
+        
+        sender.sendMessage("§a[XXW] §b正在测试QQ: " + qq + " 的等级，请稍候...");
+        
+        // 创建测试任务
+        final Long finalGroupId = groupId;
+        Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+          ltd.dreamcraft.xinxinwhitelist.test.QQLevelTest.testQQLevel(sender, qq, finalGroupId);
+        });
+      } catch (NumberFormatException e) {
+        sender.sendMessage("§a[XXW] §c请输入有效的QQ号码");
+      }
+      return true;
+    }
     sender.sendMessage("§a/xxw reload —— 重新载入配置文件");
     sender.sendMessage("§a/xxw check [玩家] —— 查看玩家QQ");
     sender.sendMessage("§a/xxw qq [QQ号码] —— 查看QQ所绑定的玩家");
@@ -268,6 +305,7 @@ public class XinxinWhiteList extends JavaPlugin {
     sender.sendMessage("§c/xxw convert —— 将YAML数据转换为MySQL");
     sender.sendMessage("§c/xxw ban [QQ] —— 封禁QQ[MYSQL]");
     sender.sendMessage("§c/xxw unban [QQ] —— 解封QQ[MYSQL]");
+    sender.sendMessage("§b/xxw testqqlevel [QQ] <群号> —— 测试QQ等级获取");
     sender.sendMessage("§c注意！！！所有涉及绑定解绑白名单的命令均为异步，重载配置为同步命令。");
     return true;
   }
